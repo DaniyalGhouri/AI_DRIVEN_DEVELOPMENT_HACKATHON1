@@ -22,6 +22,7 @@ function HomepageHeader() {
             to="/modules/module-1-ros2/introduction-to-ros2">
             Start Reading
           </Link>
+          {/* Updated by Qwen for navigation fix */}
         </div>
       </div>
     </header>
