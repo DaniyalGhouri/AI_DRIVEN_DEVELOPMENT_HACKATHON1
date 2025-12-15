@@ -1,0 +1,60 @@
+openapi: 3.0.0
+info:
+  title: RAG Highlighted Query API
+  version: 1.0.0
+paths:
+  /highlighted-query:
+    post:
+      summary: Query the RAG system based on highlighted text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                highlighted_text:
+                  type: string
+                  description: User's highlighted text.
+                  example: ROS 2 is a flexible framework...
+                query:
+                  type: string
+                  description: User's question about the highlighted text.
+                  example: What does 'flexible' mean here?
+                user_id:
+                  type: string
+                  description: Optional user ID for personalization/logging.
+                  example: user123
+                module_context:
+                  type: string
+                  description: Optional module ID if available (for precise citation).
+                  example: module-1-introduction
+              required:
+                - highlighted_text
+                - query
+      responses:
+        '200':
+          description: Query successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  answer:
+                    type: string
+                    example: In this context, 'flexible' refers to...
+                  citations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        module_id:
+                          type: string
+                          example: module-1-introduction
+                        text_snippet:
+                          type: string
+                          example: "ROS 2 is a flexible framework..."
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error

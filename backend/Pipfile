@@ -1,0 +1,20 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+fastapi = "*"
+uvicorn = {extras = ["standard"], version = "*"}
+google-generativeai = "*"
+qdrant-client = "*"
+psycopg2-binary = "*"
+python-dotenv = "*" # For loading .env files
+python-jose = {extras = ["cryptography"], version = "*"}
+passlib = {extras = ["bcrypt"], version = "*"}
+fastapi-limiter = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.12"

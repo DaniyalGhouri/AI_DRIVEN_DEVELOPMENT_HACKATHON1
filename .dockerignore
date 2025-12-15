@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.git/
+.gitignore
+*.log*
+.env*
+Dockerfile*
+*.swp
+*~
+node_modules/
+physical-ai-humanoid-robotics-textbook/

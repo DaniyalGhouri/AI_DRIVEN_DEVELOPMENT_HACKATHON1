@@ -1,0 +1,24 @@
+/* physical-ai-humanoid-robotics-textbook/src/components/RagChatWidget/styles.module.css */
+
+.chatWidgetContainer {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000; /* Ensure it floats above other content */
+}
+
+.chatToggleButton {
+  background-color: #007bff; /* Example blue */
+  color: white;
+  border: none;
+  border-radius: 50px; /* Pill-shaped button */
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.3s ease;
+}
+
+.chatToggleButton:hover {
+  background-color: #0056b3; /* Darker blue on hover */
+}

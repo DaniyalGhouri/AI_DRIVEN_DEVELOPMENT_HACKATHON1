@@ -1,0 +1,8 @@
+{
+  "modules": [
+    "module-1-introduction",
+    "module-2-ros2",
+    "module-3-simulation",
+    "module-4-perception"
+  ]
+}

@@ -1,0 +1,147 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* You can override the default Infima variables here. */
+:root {
+  --ifm-color-primary: #2E4053;
+  --ifm-color-primary-dark: #283849;
+  --ifm-color-primary-darker: #253444;
+  --ifm-color-primary-darkest: #1E2A37;
+  --ifm-color-primary-light: #34485D;
+  --ifm-color-primary-lighter: #374B62;
+  --ifm-color-primary-lightest: #415A72;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode specific adjustments for better contrast */
+html[data-theme='dark'] {
+  --ifm-color-primary: #4da6ff;
+  --ifm-color-primary-dark: #1a8cff;
+  --ifm-color-primary-darker: #0072e6;
+  --ifm-color-primary-darkest: #005db3;
+  --ifm-color-primary-light: #79c2ff;
+  --ifm-color-primary-lighter: #a6d9ff;
+  --ifm-color-primary-lightest: #d3f0ff;
+  --ifm-font-color-base: #ffffff;
+  --ifm-menu-color: #ffffff;
+  --ifm-menu-color-active: #4da6ff;
+  --ifm-navbar-link-color: #ffffff;
+  --ifm-navbar-link-hover-color: #a6d9ff;
+}
+
+/* Navigation styling */
+.navigation-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin: 2rem 0;
+  padding: 1rem 0;
+  border-top: 2px solid var(--ifm-color-emphasis-200);
+  border-bottom: 2px solid var(--ifm-color-emphasis-200);
+}
+
+.navigation-buttons a {
+  margin: 0 0.5rem;
+  color: var(--ifm-font-color-base) !important;
+}
+
+.navigation-buttons a:hover {
+  opacity: 0.8;
+}
+
+/* Breadcrumb navigation */
+.breadcrumbs {
+  font-size: 0.9rem;
+  color: var(--ifm-color-emphasis-600);
+  margin-bottom: 1rem;
+}
+
+.breadcrumbs a {
+  text-decoration: none;
+  color: var(--ifm-link-color) !important;
+}
+
+.breadcrumbs a:hover {
+  text-decoration: underline;
+}
+
+/* Module cards on homepage */
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.module-card {
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+  background-color: var(--ifm-card-background-color);
+}
+
+.module-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+
+/* Better contrast for text in dark mode */
+html[data-theme='dark'] .module-card {
+  background-color: #242526;
+  border: 1px solid #444444;
+}
+
+html[data-theme='dark'] h1,
+html[data-theme='dark'] h2,
+html[data-theme='dark'] h3,
+html[data-theme='dark'] h4,
+html[data-theme='dark'] h5,
+html[data-theme='dark'] h6 {
+  color: #ffffff;
+}
+
+html[data-theme='dark'] p,
+html[data-theme='dark'] li,
+html[data-theme='dark'] td,
+html[data-theme='dark'] th {
+  color: #e0e0e0;
+}
+
+/* Enhanced sidebar contrast */
+html[data-theme='dark'] .menu__link,
+html[data-theme='dark'] .menu__list-item-collapsible {
+  color: #e0e0e0;
+}
+
+html[data-theme='dark'] .menu__link--active,
+html[data-theme='dark'] .menu__link:hover {
+  color: #ffffff;
+  background-color: #333333;
+}
+
+/* Code block contrast */
+html[data-theme='dark'] .prism-code {
+  background-color: #1e1e1e;
+  color: #dcdcdc;
+}
+
+/* Improved navbar contrast in dark mode */
+html[data-theme='dark'] .navbar {
+  background-color: #242526;
+}
+
+html[data-theme='dark'] .navbar__title {
+  color: #ffffff;
+}
+
+html[data-theme='dark'] .navbar__link {
+  color: #cccccc;
+}
+
+html[data-theme='dark'] .navbar__link:hover {
+  color: #ffffff;
+}

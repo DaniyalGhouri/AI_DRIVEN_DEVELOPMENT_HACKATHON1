@@ -1,0 +1,26 @@
+node_modules/ 
+.DS_Store 
+dist/ 
+build/ 
+.vscode/ 
+.idea/ 
+__pycache__/ 
+.venv/ 
+venv/ 
+.env 
+npm-debug.log* 
+.npm/ 
+*.log 
+
+# Docusaurus specific
+.docusaurus/
+
+# Package manager lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Python specific
+*.pyc
+*.egg-info/
+

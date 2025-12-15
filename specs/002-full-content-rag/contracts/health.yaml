@@ -1,0 +1,27 @@
+openapi: 3.0.0
+info:
+  title: Health Check API
+  version: 1.0.0
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  qdrant_status:
+                    type: string
+                    example: connected
+                  neon_status:
+                    type: string
+                    example: connected
+        '500':
+          description: Service unhealthy
