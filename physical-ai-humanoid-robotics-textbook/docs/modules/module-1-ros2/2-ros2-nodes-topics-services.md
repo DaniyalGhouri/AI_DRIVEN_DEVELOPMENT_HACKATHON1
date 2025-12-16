@@ -326,3 +326,5 @@ This chapter has provided a deep dive into the fundamental communication pattern
 4.  **Action Feedback**: For the "perform a complex dance routine" action, what kind of feedback (`feedback` field in Action message) would be useful for a client node to receive, and what would be the final `result`?
 5.  **DDS QoS Application**: A humanoid robot's `joint_state_publisher` node (publishing `sensor_msgs/JointState`) needs to update a `whole_body_controller_node` at 100 Hz. The data is critical. What DDS QoS policy (Reliability, Durability, History) settings would you recommend and why?
 
+---
+[Previous: 1. Introduction to ROS 2](/modules/module-1-ros2/introduction-to-ros2) | [Next: 3. Python Agents to ROS Controllers via rclpy](/modules/module-1-ros2/python-agents-to-ros-controllers-via-rclpy)

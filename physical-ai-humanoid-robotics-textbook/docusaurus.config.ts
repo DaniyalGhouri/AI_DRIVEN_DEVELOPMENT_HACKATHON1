@@ -16,10 +16,10 @@ const config: Config = {
 
 
   // Set the production url of your site here
-  url: 'https://user.github.io',
+  url: 'https://your-vercel-domain.vercel.app',
   // Set the /<baseUrl>/ pathname under which your site is served
-  // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/physical-ai-humanoid-robotics-textbook/',
+  // For Vercel deployment, use '/'
+  baseUrl: '/',
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
@@ -27,6 +27,7 @@ const config: Config = {
   projectName: 'physical-ai-humanoid-robotics-textbook', // Usually your repo name.
 
   onBrokenLinks: 'warn', // Return to strict checking now that links are fixed
+  trailingSlash: false, // Vercel works better with this
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
