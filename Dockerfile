@@ -18,8 +18,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY . .
+# We copy the backend directory into /app/backend to preserve package structure
+COPY backend/ backend/
 
 # Command to run the application
-# We use sh -c to properly expand the PORT variable provided by Railway
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Run module backend.main:app
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
