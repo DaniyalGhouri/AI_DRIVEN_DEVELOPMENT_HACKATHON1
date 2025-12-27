@@ -5,9 +5,9 @@
       "destination": "/"
     }
   ],
-  "buildCommand": "cd physical-ai-humanoid-robotics-textbook && npm run build",
-  "outputDirectory": "physical-ai-humanoid-robotics-textbook/build",
-  "devCommand": "cd physical-ai-humanoid-robotics-textbook && npm run start",
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "devCommand": "npm run start",
   "cleanUrls": true,
   "trailingSlash": false
 }
