@@ -18,9 +18,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-# We copy the backend directory into /app/backend to preserve package structure
 COPY backend/ backend/
+COPY main.py .
 
 # Command to run the application
-# Run module backend.main:app
+# We try to run module backend.main:app, but having main.py in root acts as a fallback
 CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
