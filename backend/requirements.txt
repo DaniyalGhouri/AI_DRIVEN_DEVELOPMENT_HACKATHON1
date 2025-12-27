@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+google-generativeai
+qdrant-client
+psycopg2-binary
+python-dotenv
+python-jose[cryptography]
+passlib[bcrypt]
+fastapi-limiter
+slowapi

@@ -1,20 +1,25 @@
-# Use a lightweight Python image as a base
-FROM python:3.10-slim-buster
+# Use official lightweight Python image
+FROM python:3.12-slim
 
-# Set the working directory in the container
+# Set working directory
 WORKDIR /app
 
-# Copy only the dependency files first to leverage Docker cache
-COPY ./backend/Pipfile ./backend/Pipfile.lock ./
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
-RUN pip install pipenv && pipenv install --system --deploy --ignore-pipfile
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
-COPY ./backend /app
+# Copy application code
+COPY . .
 
-# Expose the port FastAPI will run on
-EXPOSE 8000
-
-# Command to run the FastAPI application
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Command to run the application
+# We use sh -c to properly expand the PORT variable provided by Railway
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
