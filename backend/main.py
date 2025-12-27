@@ -118,7 +118,7 @@ async def get_user(username: str):
     return None
 
 @app.on_event("startup")
-async def startup_event():
+def startup_event():
     try:
         database_url = os.getenv("DATABASE_URL")
         if not database_url:
