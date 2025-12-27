@@ -8,3 +8,4 @@ python-jose[cryptography]
 passlib[bcrypt]
 fastapi-limiter
 slowapi
+python-multipart
