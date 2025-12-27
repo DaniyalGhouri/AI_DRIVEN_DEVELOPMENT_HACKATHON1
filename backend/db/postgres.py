@@ -39,16 +39,16 @@ def create_tables():
             conn.close()
 
 # --- CRUD for Users ---
-def create_user(username: str, email: str, hashed_password: str) -> uuid.UUID:
+def create_user(username: str, email: str, hashed_password: str, software_background: Optional[str] = None, hardware_background: Optional[str] = None) -> uuid.UUID:
     conn = get_db_connection()
     cur = conn.cursor()
     try:
         cur.execute(
             """
-            INSERT INTO users (username, email, hashed_password)
-            VALUES (%s, %s, %s) RETURNING id
+            INSERT INTO users (username, email, hashed_password, software_background, hardware_background)
+            VALUES (%s, %s, %s, %s, %s) RETURNING id
             """,
-            (username, email, hashed_password),
+            (username, email, hashed_password, software_background, hardware_background),
         )
         user_id = cur.fetchone()[0]
         conn.commit()
@@ -66,7 +66,7 @@ def get_user_by_username(username: str) -> Optional[Dict[str, Any]]:
     cur = conn.cursor()
     try:
         cur.execute(
-            "SELECT id, username, email, hashed_password FROM users WHERE username = %s",
+            "SELECT id, username, email, hashed_password, software_background, hardware_background FROM users WHERE username = %s",
             (username,),
         )
         row = cur.fetchone()

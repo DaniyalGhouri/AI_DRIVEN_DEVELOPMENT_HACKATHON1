@@ -1,0 +1,139 @@
+/* physical-ai-humanoid-robotics-textbook/src/components/ChapterTools.css */
+
+.chapter-tools-dock {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 8px 20px;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    margin: 15px auto;
+    width: fit-content;
+    pointer-events: auto;
+    transition: all 0.3s ease;
+}
+
+.chapter-tools-dock:hover {
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.dock-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.dock-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 0.95em;
+    font-weight: 600;
+    color: #444;
+    transition: all 0.2s ease;
+}
+
+.dock-btn:hover:not(:disabled) {
+    background: rgba(0, 0, 0, 0.05);
+    transform: translateY(-1px);
+    color: #000;
+}
+
+.dock-btn.active {
+    background: rgba(118, 75, 162, 0.1);
+    color: #764ba2;
+}
+
+.dock-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.dock-btn span {
+    display: inline-block;
+}
+
+/* Mobile responsive: hide text on very small screens */
+@media (max-width: 600px) {
+    .dock-btn span {
+        display: none;
+    }
+}
+
+.dock-message {
+    font-size: 0.85em;
+    color: #764ba2;
+    font-weight: 500;
+    padding-left: 10px;
+    border-left: 1px solid rgba(0,0,0,0.1);
+    white-space: nowrap;
+    animation: fadeIn 0.3s ease;
+}
+
+.dock-divider {
+    width: 1px;
+    height: 24px;
+    background-color: rgba(0,0,0,0.1);
+}
+
+.dock-btn.logout {
+    padding: 8px 12px;
+    color: #dc3545;
+}
+
+.dock-btn.logout:hover {
+    background: rgba(220, 53, 69, 0.1);
+}
+
+/* Styles for the injected content content */
+.personalized-content, .translated-content {
+    background: white;
+    padding: 2.5rem;
+    border-radius: 16px;
+    border: 1px solid rgba(118, 75, 162, 0.2);
+    margin: 2rem 0;
+    box-shadow: 0 10px 30px rgba(118, 75, 162, 0.08);
+    position: relative;
+    line-height: 1.7;
+    font-size: 1.1em;
+}
+
+.personalized-content h3, .translated-content h3 {
+    margin-top: 0;
+    color: #764ba2;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tool-reset-btn {
+    display: block;
+    margin: 20px auto 0;
+    background: #f0f2f5;
+    color: #666;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.tool-reset-btn:hover {
+    background: #e4e6eb;
+    color: #333;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}

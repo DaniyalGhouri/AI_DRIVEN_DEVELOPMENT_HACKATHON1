@@ -1,20 +1,56 @@
 /* physical-ai-humanoid-robotics-textbook/src/components/HighlightRagButton.module.css */
 
-.highlightButton {
+.highlightMenu {
   position: absolute;
-  background-color: #6c757d; /* Muted gray */
-  color: white;
+  display: flex;
+  gap: 8px;
+  background: white;
+  padding: 6px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(0,0,0,0.05);
+  z-index: 2000;
+  animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.highlightButton, .noteButton {
   border: none;
-  border-radius: 5px;
-  padding: 5px 10px;
-  font-size: 0.8em;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.85em;
+  font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: background-color 0.2s ease;
-  z-index: 1000; /* Ensure it's above content */
-  white-space: nowrap; /* Prevent text wrapping */
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.highlightButton {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
 }
 
 .highlightButton:hover {
-  background-color: #5a6268; /* Darker gray on hover */
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(118, 75, 162, 0.3);
+}
+
+.noteButton {
+  background: #f0f2f5;
+  color: #444;
+}
+
+.noteButton:hover {
+  background: #e4e6eb;
+  color: #000;
+  transform: translateY(-1px);
+}
+
+.noteButton:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.8) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }

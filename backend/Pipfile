@@ -13,6 +13,7 @@ python-dotenv = "*" # For loading .env files
 python-jose = {extras = ["cryptography"], version = "*"}
 passlib = {extras = ["bcrypt"], version = "*"}
 fastapi-limiter = "*"
+slowapi = "*"
 
 [dev-packages]
 

@@ -1,22 +1,24 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
-import json
-from typing import List, Dict, Any, Optional
-import uuid # Import uuid for user_id
-
+from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, status, Request
 from fastapi.responses import StreamingResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
+from typing import List, Dict, Any, Optional, Annotated
+import json
+import uuid
+import os
 
-from backend.db.postgres import insert_content_chunk, get_db_connection, create_tables, create_user, get_user_by_username, create_user_profile, get_user_notes, get_chat_sessions_by_user # Import new DB functions
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+from backend.db.postgres import insert_content_chunk, get_db_connection, create_tables, create_user, get_user_by_username, create_user_profile, get_user_notes, get_chat_sessions_by_user, insert_user_note
 from backend.rag.embedding import generate_embeddings
 from backend.rag.retriever import QdrantRetriever
-from backend.agent.agent import RAGAgent # Import the RAGAgent
+from backend.agent.agent import RAGAgent
 from backend.auth.utils import verify_password, get_password_hash, create_access_token
-from backend.auth.dependencies import get_current_user # Import the dependency
+from backend.auth.dependencies import get_current_user
+from backend.schemas import User, UserInDB
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -29,16 +31,39 @@ ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
 app = FastAPI()
-limiter = FastAPILimiter(identifier=lambda request: request.client.host, backend=MemoryBackend())
-qdrant_retriever = QdrantRetriever(qdrant_host=QDRANT_HOST, qdrant_api_key=QDRANT_API_KEY)
-rag_agent = RAGAgent(gemini_api_key=GEMINI_API_KEY) # Initialize RAGAgent
 
-# Pydantic models for request bodies
+# Add CORS Middleware
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for development/hackathon
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+try:
+    if not QDRANT_HOST or not QDRANT_API_KEY:
+        print("QDRANT_HOST or QDRANT_API_KEY not set in environment")
+        raise ValueError("Missing QDRANT configuration")
+    qdrant_retriever = QdrantRetriever(qdrant_host=QDRANT_HOST, qdrant_api_key=QDRANT_API_KEY)
+    print("Qdrant connection successful.")
+except Exception as e:
+    print(f"Could not connect to Qdrant: {e}")
+    print("Running in mock mode - RAG queries will return mock responses.")
+    qdrant_retriever = None
+
+rag_agent = RAGAgent(gemini_api_key=GEMINI_API_KEY)
+
+# Pydantic models
 class FileContent(BaseModel):
     file_path: str
     content: str
     module_id: str
-    # Optional fields for more granular metadata
     chapter_id: Optional[str] = None
     section_id: Optional[str] = None
     page_number: Optional[int] = None
@@ -48,7 +73,7 @@ class IngestRequest(BaseModel):
 
 class QueryRequest(BaseModel):
     query: str
-    user_id: Optional[str] = None # Changed to str for simplicity with UUID for now
+    user_id: Optional[str] = None
     module_context: Optional[str] = None
 
 class HighlightedQueryRequest(BaseModel):
@@ -61,7 +86,15 @@ class TranslationRequest(BaseModel):
     text: str
     target_language: str
 
-# JWT Authentication Models
+class PersonalizeRequest(BaseModel):
+    text: str
+    module_context: Optional[str] = None
+
+class NoteCreate(BaseModel):
+    note_content: str
+    module_id: Optional[str] = None
+    text_selection: Optional[str] = None
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -69,21 +102,14 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
-class User(BaseModel):
-    id: uuid.UUID # Add ID for the user
-    username: str
-    email: Optional[str] = None
-    full_name: Optional[str] = None
-    disabled: Optional[bool] = None
-
-class UserInDB(User):
-    hashed_password: str
 
 class UserCreate(BaseModel):
     username: str
     password: str
     email: Optional[str] = None
     full_name: Optional[str] = None
+    software_background: Optional[str] = None
+    hardware_background: Optional[str] = None
 
 async def get_user(username: str):
     db_user = get_user_by_username(username)
@@ -93,31 +119,45 @@ async def get_user(username: str):
 
 @app.on_event("startup")
 async def startup_event():
-    # Ensure database tables exist on startup
     try:
-        create_tables()
-        print("Database tables ensured.")
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            print("DATABASE_URL not set. Database functionality limited.")
+        else:
+            create_tables()
+            print("Database tables ensured.")
     except Exception as e:
-        print(f"Failed to ensure database tables: {e}")
-        # Depending on criticality, you might want to exit or log more severely
+        print(f"Error creating tables: {e}")
 
 @app.post("/register", response_model=User)
 @limiter.limit("5/minute")
-async def register(user: UserCreate):
+async def register(request: Request, user: UserCreate):
     db_user = await get_user(user.username)
     if db_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already registered"
         )
-    user_id = create_user(user.username, user.email, get_password_hash(user.password))
-    # Create a user profile upon registration
-    create_user_profile(user_id) 
-    return User(id=user_id, username=user.username, email=user.email, full_name=user.full_name)
+    user_id = create_user(
+        user.username, 
+        user.email, 
+        get_password_hash(user.password),
+        user.software_background,
+        user.hardware_background
+    )
+    create_user_profile(user_id)
+    return User(
+        id=user_id, 
+        username=user.username, 
+        email=user.email, 
+        full_name=user.full_name,
+        software_background=user.software_background,
+        hardware_background=user.hardware_background
+    )
 
 @app.post("/token", response_model=Token)
 @limiter.limit("10/minute")
-async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+async def login_for_access_token(request: Request, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     user = await get_user(form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
@@ -133,59 +173,98 @@ async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm,
 
 @app.get("/users/me/", response_model=User)
 @limiter.limit("60/minute")
-async def read_users_me(current_user: Annotated[User, Depends(get_current_user)]):
-    return current_user
+async def read_users_me(request: Request, current_user: Annotated[User, Depends(get_current_user)]):
+    db_user = get_user_by_username(current_user.username)
+    if not db_user:
+         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    # Return full DB user to include background info which might not be in token
+    return User(**db_user)
+
+@app.post("/users/me/notes")
+@limiter.limit("10/minute")
+async def create_my_note(request: Request, note: NoteCreate, current_user: Annotated[User, Depends(get_current_user)]):
+    try:
+        db_user = get_user_by_username(current_user.username)
+        if not db_user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        
+        note_id = insert_user_note(
+            user_id=uuid.UUID(str(db_user["id"])),
+            note_content=note.note_content,
+            module_id=note.module_id,
+            text_selection=note.text_selection
+        )
+        return {"note_id": str(note_id), "status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving note: {e}")
 
 @app.get("/users/me/notes")
 @limiter.limit("30/minute")
-async def read_my_notes(current_user: Annotated[User, Depends(get_current_user)]):
-    # In a real app, user.id would be a UUID object from the DB.
-    # Here, get_current_user returns { "username": username }, so we need to fetch the full user.
+async def read_my_notes(request: Request, current_user: Annotated[User, Depends(get_current_user)]):
     db_user = get_user_by_username(current_user.username)
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
-    notes = get_user_notes(user_id=uuid.UUID(db_user["id"]))
+    notes = get_user_notes(user_id=uuid.UUID(str(db_user["id"])))
     return notes
 
 @app.get("/users/me/chat_sessions")
 @limiter.limit("30/minute")
-async def read_my_chat_sessions(current_user: Annotated[User, Depends(get_current_user)]):
+async def read_my_chat_sessions(request: Request, current_user: Annotated[User, Depends(get_current_user)]):
     db_user = get_user_by_username(current_user.username)
     if not db_user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     
-    chat_sessions = get_chat_sessions_by_user(user_id=uuid.UUID(db_user["id"]))
+    chat_sessions = get_chat_sessions_by_user(user_id=uuid.UUID(str(db_user["id"])))
     return chat_sessions
+
+@app.post("/personalize")
+@limiter.limit("10/minute")
+async def personalize_content(request: Request, personalize_request: PersonalizeRequest, current_user: Annotated[User, Depends(get_current_user)]):
+    try:
+        db_user = get_user_by_username(current_user.username)
+        if not db_user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
         
+        sw_bg = db_user.get("software_background", "general")
+        hw_bg = db_user.get("hardware_background", "general")
+
+        prompt = (
+            f"Rewrite the following educational content to be more suitable for a student with "
+            f"a software background in '{sw_bg}' and a hardware background in '{hw_bg}'. "
+            f"Use analogies and examples relevant to their background if possible. "
+            f"Keep the core technical information accurate.\n\n"
+            f"Content:\n{personalize_request.text}"
+        )
+
+        response = await rag_agent.generate_response(query=prompt, context=[])
+        personalized_text = response.get("answer", "Could not personalize content.")
+        
+        return {"personalized_text": personalized_text}
+    except Exception as e:
+         raise HTTPException(status_code=500, detail=f"Error customizing content: {e}")
+
 @app.post("/ingest")
 @limiter.limit("1/minute")
-async def ingest_content(request: IngestRequest, background_tasks: BackgroundTasks):
-    # This is a simplified ingestion. In a real scenario, chunking would happen here.
-    # For now, we treat each 'file' as a single chunk for embedding.
-    # A more advanced chunking strategy (e.g., hierarchical) would be implemented here.
-
+async def ingest_content(request: Request, ingest_request: IngestRequest, background_tasks: BackgroundTasks):
     texts_to_embed = []
     metadatas_to_store = []
     
-    for file_data in request.files:
-        # Generate a unique ID for this content chunk
+    for file_data in ingest_request.files:
         chunk_id = uuid.uuid4()
-        
         texts_to_embed.append(file_data.content)
         metadatas_to_store.append({
             "id": str(chunk_id),
-            "text": file_data.content, # Store full text in metadata as well for retrieval
+            "text": file_data.content,
             "module_id": file_data.module_id,
             "chapter_id": file_data.chapter_id,
             "section_id": file_data.section_id,
             "page_number": file_data.page_number,
             "file_path": file_data.file_path,
-            "version": "1.0", # Placeholder version
+            "version": "1.0",
             "updated_at": datetime.now(timezone.utc).isoformat(),
         })
 
-        # Store metadata in Neon Postgres
         background_tasks.add_task(
             insert_content_chunk,
             id=chunk_id,
@@ -194,150 +273,123 @@ async def ingest_content(request: IngestRequest, background_tasks: BackgroundTas
             chapter_id=file_data.chapter_id,
             section_id=file_data.section_id,
             page_number=file_data.page_number,
-            start_index=0, # Simplified
-            end_index=len(file_data.content), # Simplified
+            start_index=0,
+            end_index=len(file_data.content),
             file_path=file_data.file_path,
             version="1.0",
         )
     
-    # Generate embeddings and upsert to Qdrant in a background task
-    # This assumes chunking has already happened or each file_data.content is a chunk
     async def _embed_and_upsert():
         try:
-            embeddings = generate_embeddings(texts_to_embed, gemini_api_key=GEMINI_API_KEY)
-            # Add embeddings to metadata for Qdrant payload if needed, or keep separate
-            # QdrantRetriever expects metadatas as a list of dicts, and handles point IDs internally
+            embeddings = generate_embeddings(texts_to_embed, gemini_api_key=GEMINI_API_KEY, task_type="retrieval_document")
             qdrant_retriever.upsert_vectors(embeddings, metadatas_to_store)
             print(f"Successfully embedded and upserted {len(embeddings)} chunks to Qdrant.")
         except Exception as e:
             print(f"Error during embedding or Qdrant upsert: {e}")
 
     background_tasks.add_task(_embed_and_upsert)
-
     return {"status": "success", "message": f"{len(request.files)} files submitted for ingestion."}
-
 
 @app.post("/query")
 @limiter.limit("20/minute")
-async def query_rag(request: QueryRequest, current_user: Annotated[User, Depends(get_current_user)]):
+async def query_rag(request: Request, query_request: QueryRequest, current_user: Annotated[User, Depends(get_current_user)]):
     try:
-        # Fetch the full user object to get the UUID id
         db_user = get_user_by_username(current_user.username)
         if not db_user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-        request.user_id = str(db_user["id"]) # Assign the authenticated user's ID
-        
-        # 1. Generate embedding for the query
-        query_embedding = generate_embeddings([request.query], gemini_api_key=GEMINI_API_KEY)[0]
+        query_request.user_id = str(db_user["id"])
 
-        # 2. Retrieve relevant chunks from Qdrant
-        # Use module_context for filtering if provided
-        retrieved_chunks = qdrant_retriever.search_vectors(
-            query_embedding=query_embedding,
-            limit=7, # Top-k chunks (5-8 as per spec)
-            module_id=request.module_context
-        )
-        
-        # 3. Re-rank with LLM (simplified for now, actual re-ranking would be more complex)
-        # For this implementation, we'll just use the retrieved order.
-        # A proper re-ranking step would involve another LLM call or a re-ranking model.
-        
-        # 4. Generate response using RAGAgent
-        response_data = await rag_agent.generate_response(request.query, retrieved_chunks)
-        
-        # 5. Handle streaming (simplified, as agent.generate_response currently returns full text)
-        # For actual streaming, rag_agent.generate_response would yield chunks.
-        return StreamingResponse(
-            iter([json.dumps(response_data)]), # Yield a single JSON string for now
-            media_type="application/json"
-        )
+        if qdrant_retriever is None:
+            response_data = {
+                "answer": "Mock response: RAG system is not connected.",
+                "citations": []
+            }
+        else:
+            try:
+                query_embedding = generate_embeddings([query_request.query], gemini_api_key=GEMINI_API_KEY, task_type="retrieval_query")[0]
+                retrieved_chunks = qdrant_retriever.search_vectors(
+                    query_embedding=query_embedding,
+                    limit=7,
+                    module_id=query_request.module_context
+                )
+                response_data = await rag_agent.generate_response(query_request.query, retrieved_chunks)
+            except Exception as e:
+                print(f"Embedding/Search failed (likely quota): {e}")
+                # Fallback to direct model response without textbook context
+                response_data = await rag_agent.generate_response(
+                    query=f"Note: Search is temporarily disabled due to quota limits. Question: {query_request.query}", 
+                    context=[]
+                )
+
+        return StreamingResponse(iter([json.dumps(response_data)]), media_type="application/json")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing query: {e}")
 
 @app.post("/highlighted-query")
 @limiter.limit("20/minute")
-async def highlighted_query_rag(request: HighlightedQueryRequest, current_user: Annotated[User, Depends(get_current_user)]):
+async def highlighted_query_rag(request: Request, highlight_request: HighlightedQueryRequest, current_user: Annotated[User, Depends(get_current_user)]):
     try:
-        # Fetch the full user object to get the UUID id
         db_user = get_user_by_username(current_user.username)
         if not db_user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-        request.user_id = str(db_user["id"]) # Assign the authenticated user's ID
-        
-        # Context from highlighted text is primary
-        highlight_context = [{
-            "text": request.highlighted_text,
-            "file_path": "user_highlight", # Indicate source
-            "module_id": request.module_context or "unknown",
-        }]
+        highlight_request.user_id = str(db_user["id"])
 
-        # Generate embedding for the query to retrieve additional context
-        query_embedding = generate_embeddings([request.query], gemini_api_key=GEMINI_API_KEY)[0]
+        if qdrant_retriever is None:
+            response_data = {
+                "answer": "Mock response: RAG system is not connected.",
+                "citations": []
+            }
+        else:
+            highlight_context = [{
+                "text": highlight_request.highlighted_text,
+                "file_path": "user_highlight",
+                "module_id": highlight_request.module_context or "unknown",
+            }]
+            try:
+                query_embedding = generate_embeddings([highlight_request.query], gemini_api_key=GEMINI_API_KEY, task_type="retrieval_query")[0]
+                retrieved_chunks = qdrant_retriever.search_vectors(
+                    query_embedding=query_embedding,
+                    limit=5,
+                    module_id=highlight_request.module_context
+                )
+                combined_context = highlight_context + retrieved_chunks
+                response_data = await rag_agent.generate_response(highlight_request.query, combined_context)
+            except Exception as e:
+                print(f"Embedding failed in highlight query: {e}")
+                # Fallback: Just use the highlighted text as context
+                response_data = await rag_agent.generate_response(highlight_request.query, highlight_context)
 
-        # Retrieve relevant chunks from Qdrant, excluding anything already in highlight_context
-        # For simplicity, we assume no overlap, or agent handles redundancy
-        retrieved_chunks = qdrant_retriever.search_vectors(
-            query_embedding=query_embedding,
-            limit=5, # Fewer chunks as highlighted text is primary
-            module_id=request.module_context
-        )
-        
-        # Combine highlighted text and retrieved chunks
-        # Prioritize highlighted text by placing it first
-        combined_context = highlight_context + retrieved_chunks
-        
-        # Generate response using RAGAgent
-        response_data = await rag_agent.generate_response(request.query, combined_context)
-        
-        return StreamingResponse(
-            iter([json.dumps(response_data)]),
-            media_type="application/json"
-        )
+        return StreamingResponse(iter([json.dumps(response_data)]), media_type="application/json")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing highlighted query: {e}")
 
 @app.post("/translate")
 @limiter.limit("10/minute")
-async def translate_text(request: TranslationRequest, current_user: Annotated[User, Depends(get_current_user)]):
+async def translate_text(request: Request, translate_request: TranslationRequest, current_user: Annotated[User, Depends(get_current_user)]):
     try:
-        # Construct a prompt for the Gemini model to perform translation
         translation_prompt = (
-            f"Translate the following text to {request.target_language}. "
-            f"Only return the translated text and nothing else:\n\n"
-            f"{request.text}"
+            f"Translate the following English text to Urdu. "
+            f"Only return the translated Urdu text and nothing else:\n\n"
+            f"{translate_request.text}"
         )
-        
-        # Use the RAGAgent to generate the translation.
-        # Note: For pure translation, context might not be needed or would be empty.
-        # Re-using RAGAgent for simplicity here.
-        translation_response = await rag_agent.generate_response(
-            query=translation_prompt,
-            context=[] # No retrieval context needed for pure translation
-        )
-        
-        # The generate_response method returns a dict with 'answer'.
+        translation_response = await rag_agent.generate_response(query=translation_prompt, context=[])
         translated_text = translation_response.get("answer", "Translation failed.")
-        
         return {"translated_text": translated_text}
     except Exception as e:
-        print(f"Error during translation: {e}")
         raise HTTPException(status_code=500, detail=f"Error during translation: {e}")
 
 @app.get("/users/me/recommendations")
 @limiter.limit("5/minute")
-async def get_my_recommendations(current_user: Annotated[User, Depends(get_current_user)]):
+async def get_my_recommendations(request: Request, current_user: Annotated[User, Depends(get_current_user)]):
     try:
         db_user = get_user_by_username(current_user.username)
         if not db_user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
         
-        user_id_uuid = uuid.UUID(db_user["id"])
-        
-        # Retrieve user's notes and chat sessions
+        user_id_uuid = uuid.UUID(str(db_user["id"]))
         user_notes = get_user_notes(user_id=user_id_uuid)
         user_chat_sessions = get_chat_sessions_by_user(user_id=user_id_uuid)
         
-        # Combine into a context for recommendations
         context_for_recommendations = []
         if user_notes:
             context_for_recommendations.append({"text": "User's notes: " + " ".join([note["note_content"] for note in user_notes]), "source": "notes"})
@@ -351,47 +403,35 @@ async def get_my_recommendations(current_user: Annotated[User, Depends(get_curre
                 context_for_recommendations.append({"text": "User's chat history: " + " ".join(chat_history_text), "source": "chat_history"})
 
         if not context_for_recommendations:
-            return {"recommendations": "No sufficient data to generate recommendations yet. Start interacting with the chatbot or add some notes!"}
+            return {"recommendations": "No sufficient data to generate recommendations yet."}
 
-        # Craft a prompt for the RAG agent to generate recommendations
         recommendation_query = (
-            "Based on the following user interactions (notes and chat history), "
-            "provide personalized learning recommendations related to Physical AI and Humanoid Robotics. "
-            "Suggest relevant topics, modules, or external resources. Be concise and helpful."
+            "Based on the following user interactions, provide personalized learning recommendations. "
+            "Suggest relevant topics or modules."
         )
 
-        response_data = await rag_agent.generate_response(
-            query=recommendation_query,
-            context=context_for_recommendations # Pass the combined context
-        )
-        
+        response_data = await rag_agent.generate_response(query=recommendation_query, context=context_for_recommendations)
         return {"recommendations": response_data.get("answer", "Could not generate recommendations.")}
 
     except Exception as e:
-        print(f"Error generating recommendations: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating recommendations: {e}")
 
 @app.get("/health")
 async def health_check():
     status_qdrant = {"status": "ok", "message": ""}
     status_neon = {"status": "ok", "message": ""}
-
-    # Check Qdrant status
     try:
-        # Attempt to list collections to verify Qdrant connectivity
         qdrant_retriever.client.get_collections()
         status_qdrant["status"] = "ok"
     except Exception as e:
         status_qdrant["status"] = "error"
         status_qdrant["message"] = str(e)
 
-    # Check Neon Postgres status
     conn = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("SELECT 1")
-        cur.fetchone()
         status_neon["status"] = "ok"
     except Exception as e:
         status_neon["status"] = "error"
@@ -402,16 +442,8 @@ async def health_check():
             conn.close()
 
     overall_status = "ok" if status_qdrant["status"] == "ok" and status_neon["status"] == "ok" else "error"
+    return {"overall_status": overall_status, "services": {"qdrant": status_qdrant, "neon_postgres": status_neon}}
 
-    return {
-        "overall_status": overall_status,
-        "services": {
-            "qdrant": status_qdrant,
-            "neon_postgres": status_neon,
-        }
-    }
-
-# Main application entry point for development
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
