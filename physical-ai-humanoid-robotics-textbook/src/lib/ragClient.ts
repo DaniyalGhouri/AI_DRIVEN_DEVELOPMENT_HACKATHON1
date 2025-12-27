@@ -1,8 +1,9 @@
 // physical-ai-humanoid-robotics-textbook/src/lib/ragClient.ts
 
 import axios from 'axios';
+import siteConfig from '@generated/docusaurus.config';
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = siteConfig.customFields?.backendUrl as string || "http://localhost:8000";
 
 interface FileContent {
   file_path: string;

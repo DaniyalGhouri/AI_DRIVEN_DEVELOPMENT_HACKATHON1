@@ -14,6 +14,11 @@ const config: Config = {
     v4: true, // Improve compatibility with the upcoming Docusaurus v4
   },
 
+  customFields: {
+    // Put your custom environment variables here
+    backendUrl: process.env.BACKEND_URL || 'http://localhost:8000',
+  },
+
 
   // Set the production url of your site here
   url: 'https://your-vercel-domain.vercel.app',
