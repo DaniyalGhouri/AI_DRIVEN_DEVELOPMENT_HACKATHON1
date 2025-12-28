@@ -46,6 +46,10 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+@app.get("/")
+async def root():
+    return {"message": "Physical AI Textbook API is running", "docs_url": "/docs"}
+
 try:
     if not QDRANT_HOST or not QDRANT_API_KEY:
         print("QDRANT_HOST or QDRANT_API_KEY not set in environment")
